@@ -1,3 +1,7 @@
+use shapefile::{Shape, ShapeReader};
+use std::io::Cursor;
+use std::mem::ManuallyDrop;
+
 const DEGREE_TO_RADIAN_CONSTANT: f64 = std::f64::consts::PI / 180_f64;
 const RADIAN_TO_DEGREE_CONSTANT: f64 = 180_f64 / std::f64::consts::PI;
 
@@ -42,6 +46,53 @@ pub fn latlon_to_amateur_radio_great_circle_map(
         latitude_delta_radian_sine * k,
     )
 }
+
+// TODO used wide to accelerate multipoint,line,polygon
+//pub fn latlon_to_amateur_radio_great_circle_map_simd() {}
+
+pub struct ReturnContent {
+    pub status: bool,
+    pub ptr: *const u8,
+    pub len: usize,
+}
+
+impl ReturnContent {
+    fn new(data: Vec<u8>, status: bool) -> Self {
+        let data = ManuallyDrop::new(data);
+        ReturnContent {
+            status: status,
+            ptr: data.as_ptr(),
+            len: data.len(),
+        }
+    }
+}
+
+pub struct ColorData {
+    pub color_point: u8,
+    pub color_multipoint: u8,
+    pub color_line: u8,
+    pub color_polygon_line: u8,
+    pub color_polygon_fill: u8,
+}
+
+pub fn shapefile_generate(
+    buffer_ptr: *const u8,
+    buffer_len: usize,
+    color: ColorData,
+) -> ReturnContent {
+    let buffer = unsafe { std::slice::from_raw_parts(buffer_ptr, buffer_len) };
+    let cursor = Cursor::new(buffer);
+    let mut reader = match ShapeReader::new(cursor) {
+        Ok(data) => data,
+        Err(e) => return ReturnContent::new(e.to_string().into_bytes(), false),
+    };
+    // TODO Draw the picture used par_iter
+    //    reader.for_each(|shape| )
+    ReturnContent::new(Vec::new(), true)
+}
+
+// TODO Draw fuction
+//fn shapefile_draw() -> {}
 
 #[cfg(test)]
 mod tests {
