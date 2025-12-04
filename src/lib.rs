@@ -9,6 +9,13 @@ const DEGREE_TO_RADIAN_CONSTANT: f64 = std::f64::consts::PI / 180_f64;
 const RADIAN_TO_DEGREE_CONSTANT: f64 = 180_f64 / std::f64::consts::PI;
 const FRAC_PI_DEGREE: f64x8 = f64x8::new([180f64; 8]);
 
+#[unsafe(no_mangle)]
+pub extern "C" fn free<T>(ptr: *const T, len: usize) {
+    unsafe {
+        let _ = Box::from_raw(std::slice::from_raw_parts_mut(ptr as *mut T, len));
+    }
+}
+
 #[repr(C)]
 pub struct LatlonToAzimnthIsometricCsupport {
     pub x: f64,
@@ -85,7 +92,7 @@ impl LatlonToAzimnthIsometricSimdCsupport {
     }
 
     pub fn set_a(&mut self, data: Vec<f64>) {
-        let data_memory = ManuallyDrop::new(data);
+        let data_memory = ManuallyDrop::new(data.into_boxed_slice());
         self.a_ptr = data_memory.as_ptr();
         self.a_len = data_memory.len();
     }
@@ -98,7 +105,7 @@ impl LatlonToAzimnthIsometricSimdCsupport {
     }
 
     pub fn set_b(&mut self, data: Vec<f64>) {
-        let data_memory = ManuallyDrop::new(data);
+        let data_memory = ManuallyDrop::new(data.into_boxed_slice());
         self.b_ptr = data_memory.as_ptr();
         self.b_len = data_memory.len();
     }
@@ -192,7 +199,7 @@ pub struct ReturnContent {
 
 impl ReturnContent {
     fn new(data: Vec<u8>, status: bool) -> Self {
-        let data = ManuallyDrop::new(data);
+        let data = ManuallyDrop::new(data.into_boxed_slice());
         ReturnContent {
             status: status,
             ptr: data.as_ptr(),
