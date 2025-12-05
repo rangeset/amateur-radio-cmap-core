@@ -3,6 +3,7 @@ use image::{ColorType, ImageEncoder};
 use imageproc::drawing::{draw_filled_circle_mut, draw_line_segment_mut, draw_polygon_mut};
 use imageproc::image::{Rgba, RgbaImage};
 use rayon::prelude::*;
+use shapefile::record::multipoint::GenericMultipoint;
 use shapefile::record::traits::HasXY;
 use shapefile::{Shape, ShapeReader};
 use std::io::Cursor;
@@ -321,6 +322,30 @@ fn shapefile_draw(img: &mut RgbaImage, parameter: &GenerateParameters, shape: Sh
             point,
             parameter.radius as i32,
         ),
+        Shape::Multipoint(points) => shapefile_draw_multipoint(
+            img,
+            parameter.color_point,
+            parameter.width_point,
+            ltc,
+            points,
+            parameter.radius as i32,
+        ),
+        Shape::MultipointM(points) => shapefile_draw_multipoint(
+            img,
+            parameter.color_point,
+            parameter.width_point,
+            ltc,
+            points,
+            parameter.radius as i32,
+        ),
+        Shape::MultipointZ(points) => shapefile_draw_multipoint(
+            img,
+            parameter.color_point,
+            parameter.width_point,
+            ltc,
+            points,
+            parameter.radius as i32,
+        ),
         _ => return, // TODO
     }
 }
@@ -337,6 +362,28 @@ fn shapefile_draw_point<T: HasXY>(
     let x = (x * ltc).round() as i32 + r;
     let y = (y * ltc).round() as i32 + r;
     draw_filled_circle_mut(img, (x, y), width, get_color_rgba(color));
+}
+
+fn shapefile_draw_multipoint<T: HasXY>(
+    img: &mut RgbaImage,
+    color: u32,
+    width: i32,
+    ltc: f64,
+    points: GenericMultipoint<T>,
+    r: i32,
+) {
+    let mut latitudes = Vec::<f64>::new();
+    let mut longitudes = Vec::<f64>::new();
+    points.into_inner().iter().for_each(|point| {
+        latitudes.push(point.y());
+        longitudes.push(point.x());
+    });
+    let (xs, ys) = latlon_to_azimnth_isometric_simd(latitudes, longitudes);
+    for (x_origin, y_origin) in xs.iter().copied().zip(ys.iter().copied()) {
+        let x = (x_origin * ltc).round() as i32 + r;
+        let y = (y_origin * ltc).round() as i32 + r;
+        draw_filled_circle_mut(img, (x, y), width, get_color_rgba(color));
+    }
 }
 
 fn get_color_rgba(color: u32) -> Rgba<u8> {
@@ -462,7 +509,7 @@ mod tests {
 
         let mut out_file = File::create("./out/image.png").unwrap();
         let out_buffer = shapefile_generate(&buffer, parameter).expect("Shapefile Error");
-        out_file.write_all(&out_buffer);
+        let _ = out_file.write_all(&out_buffer);
 
         result.compare();
 
